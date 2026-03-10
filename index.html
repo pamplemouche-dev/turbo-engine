@@ -3,14 +3,16 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Web Studio v0.3</title>
+    <title>Web Studio v0.4 - Transform</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
 <div class="studio-root">
     <div class="toolbar">
-        <button class="tool-btn active">Select</button>
+        <button class="tool-btn active" id="btn-translate" onclick="window.setMode('translate')">Move</button>
+        <button class="tool-btn" id="btn-rotate" onclick="window.setMode('rotate')">Rotate</button>
+        <button class="tool-btn" id="btn-scale" onclick="window.setMode('scale')">Scale</button>
         
         <div class="separator"></div>
 
@@ -28,7 +30,7 @@
 
     <div class="main-content">
         <div id="viewport">
-            <div class="version-tag">Studio Editor v0.3 - Shapes</div>
+            <div class="version-tag">Studio Editor v0.4 - Transform Controls</div>
         </div>
 
         <aside class="sidebar" id="right-sidebar">
