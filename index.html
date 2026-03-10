@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>Web Studio - Accueil</title>
+    <link rel="stylesheet" href="style.css">
+    <style>
+        .dashboard { padding: 50px; max-width: 1000px; margin: auto; }
+        .project-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 20px; margin-top: 30px; }
+        .project-card { background: #2d2d2d; border-radius: 8px; padding: 20px; cursor: pointer; border: 1px solid #444; transition: 0.2s; }
+        .project-card:hover { border-color: #0078d4; transform: translateY(-5px); }
+        .new-btn { background: #0078d4; color: white; border: none; padding: 15px 30px; border-radius: 5px; cursor: pointer; font-weight: bold; }
+    </style>
+</head>
+<body class="studio-root">
+    <div class="dashboard">
+        <h1>Mes Projets</h1>
+        <button class="new-btn" onclick="createNewProject()">+ Nouveau Projet</button>
+        
+        <div id="project-list" class="project-grid">
+            </div>
+    </div>
+
+    <script>
+        function loadProjects() {
+            const projects = JSON.parse(localStorage.getItem('roblox_projects') || '{}');
+            const list = document.getElementById('project-list');
+            list.innerHTML = '';
+
+            Object.keys(projects).forEach(id => {
+                const card = document.createElement('div');
+                card.className = 'project-card';
+                card.innerHTML = `<h3>${projects[id].name}</h3><p>Modifié le: ${projects[id].date}</p>`;
+                card.onclick = () => window.location.href = `./editor/index.html?id=${id}`;
+                list.appendChild(card);
+            });
+        }
+
+        function createNewProject() {
+            const name = prompt("Nom du projet ?") || "Nouveau Projet";
+            const id = 'proj_' + Date.now();
+            window.location.href = `./editor/index.html?id=${id}&name=${encodeURIComponent(name)}`;
+        }
+
+        loadProjects();
+    </script>
+</body>
+</html>
