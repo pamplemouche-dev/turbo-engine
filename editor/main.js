@@ -1,28 +1,28 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { TransformControls } from 'three/addons/controls/TransformControls.js';
+import { db } from "../firebase-config.js";
+import { doc, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
-// --- INITIALISATION ---
+const params = new URLSearchParams(window.location.search);
+const projectId = params.get('id');
+const projectName = params.get('name') || "Projet sans nom";
+
+// --- SETUP SCÈNE ---
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0xadd8e6); 
-
 const viewport = document.getElementById('viewport');
 const camera = new THREE.PerspectiveCamera(75, viewport.clientWidth / viewport.clientHeight, 0.1, 1000);
 camera.position.set(20, 20, 20);
-
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setSize(viewport.clientWidth, viewport.clientHeight);
-renderer.setPixelRatio(window.devicePixelRatio);
 viewport.appendChild(renderer.domElement);
 
-// --- LUMIÈRES ---
-const ambientLight = new THREE.AmbientLight(0x707070);
-scene.add(ambientLight);
-const sunLight = new THREE.DirectionalLight(0xffffff, 1);
-sunLight.position.set(10, 20, 10);
-scene.add(sunLight);
+scene.add(new THREE.AmbientLight(0x707070));
+const sun = new THREE.DirectionalLight(0xffffff, 1);
+sun.position.set(10, 20, 10);
+scene.add(sun);
 
-// --- GRILLE & BASEPLATE ---
 const grid = new THREE.GridHelper(100, 100, 0x555555, 0x888888);
 scene.add(grid);
 
@@ -31,70 +31,71 @@ const baseplate = new THREE.Mesh(
     new THREE.MeshPhongMaterial({ color: 0x999999 })
 );
 baseplate.position.y = -0.5;
-baseplate.name = "Baseplate";
 scene.add(baseplate);
 
-// --- CONTRÔLES ---
 const controls = new OrbitControls(camera, renderer.domElement);
-controls.mouseButtons = { RIGHT: THREE.MOUSE.ROTATE, MIDDLE: THREE.MOUSE.PAN };
-
 const transformControls = new TransformControls(camera, renderer.domElement);
 scene.add(transformControls);
+transformControls.addEventListener('dragging-changed', (e) => controls.enabled = !e.value);
 
-// Empêcher la caméra de bouger quand on manipule l'objet
-transformControls.addEventListener('dragging-changed', (e) => {
-    controls.enabled = !e.value;
-});
-
-// --- VARIABLES ÉTAT ---
+let selectedObject = null;
 const raycaster = new THREE.Raycaster();
 const mouse = new THREE.Vector2();
-let selectedObject = null;
 
-// --- FONCTIONS ---
+// --- CLOUD FUNCTIONS (FIREBASE) ---
 
-window.setMode = function(mode) {
-    transformControls.setMode(mode);
-    document.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('active'));
-    document.getElementById('btn-' + mode).classList.add('active');
-};
+async function saveProject() {
+    if (!projectId) return;
+    const objectsData = [];
 
-function selectObject(obj) {
-    selectedObject = obj;
-    transformControls.attach(obj);
-    
-    const propPanel = document.getElementById('properties-panel');
-    propPanel.innerHTML = `
-        <div style="margin-bottom:10px;"><b>Nom:</b> ${obj.userData.name}</div>
-        <div style="margin-bottom:5px;"><b>Couleur:</b></div>
-        <input type="color" id="colorPicker" value="#${obj.material.color.getHexString()}">
-        <button id="del-btn" style="margin-top:15px; width:100%; background:#b33939; color:white; border:none; padding:8px; cursor:pointer; border-radius:4px;">Supprimer</button>
-    `;
+    scene.children.forEach(obj => {
+        if (obj.type === "Mesh" && obj !== baseplate) {
+            objectsData.push({
+                shape: obj.userData.shape,
+                name: obj.userData.name,
+                pos: obj.position.toArray(),
+                rot: obj.rotation.toArray(),
+                sca: obj.scale.toArray(),
+                col: '#' + obj.material.color.getHexString()
+            });
+        }
+    });
 
-    document.getElementById('colorPicker').oninput = (e) => obj.material.color.set(e.target.value);
-    document.getElementById('del-btn').onclick = () => {
-        scene.remove(obj);
-        deselectObject();
-        // Optionnel : retirer de l'UI explorer
-    };
+    try {
+        await setDoc(doc(db, "projects", projectId), {
+            name: projectName,
+            lastModified: new Date(),
+            data: objectsData
+        });
+    } catch (e) { console.error("Erreur save:", e); }
 }
 
-function deselectObject() {
-    selectedObject = null;
-    transformControls.detach();
-    document.getElementById('properties-panel').innerHTML = '<p class="empty-msg">Aucun objet sélectionné</p>';
+async function loadProject() {
+    if (!projectId) return;
+    const docSnap = await getDoc(doc(db, "projects", projectId));
+
+    if (docSnap.exists()) {
+        const project = docSnap.data();
+        project.data.forEach(item => {
+            createPart(item.shape, item.col, item.pos, item.rot, item.sca, item.name);
+        });
+    }
 }
 
-window.addPart = function() {
-    const shape = document.getElementById('shape-selector').value;
+// --- CORE LOGIC ---
+
+function createPart(shape, color, pos = [0,2,0], rot = [0,0,0], sca = [1,1,1], name = null) {
     let geo;
     if(shape === 'sphere') geo = new THREE.SphereGeometry(2, 32, 16);
     else if(shape === 'cylinder') geo = new THREE.CylinderGeometry(2, 2, 4, 32);
     else geo = new THREE.BoxGeometry(4, 4, 4);
 
-    const part = new THREE.Mesh(geo, new THREE.MeshPhongMaterial({ color: 0x00a2ff }));
-    part.position.set(0, 2, 0);
-    part.userData.name = shape.charAt(0).toUpperCase() + shape.slice(1);
+    const part = new THREE.Mesh(geo, new THREE.MeshPhongMaterial({ color: color }));
+    part.position.fromArray(pos);
+    part.rotation.fromArray(rot);
+    part.scale.fromArray(sca);
+    part.userData.shape = shape;
+    part.userData.name = name || (shape.charAt(0).toUpperCase() + shape.slice(1));
     scene.add(part);
 
     const item = document.createElement('div');
@@ -102,30 +103,52 @@ window.addPart = function() {
     item.innerHTML = "• " + part.userData.name;
     item.onclick = (e) => { e.stopPropagation(); selectObject(part); };
     document.getElementById('explorer-tree').appendChild(item);
-    
+    return part;
+}
+
+window.addPart = function() {
+    const shape = document.getElementById('shape-selector').value;
+    const part = createPart(shape, 0x00a2ff);
     selectObject(part);
+    saveProject();
 };
 
-// --- EVENTS ---
+function selectObject(obj) {
+    selectedObject = obj;
+    transformControls.attach(obj);
+    document.getElementById('properties-panel').innerHTML = `
+        <b>Nom:</b> ${obj.userData.name}<br><br>
+        <input type="color" id="cp" value="#${obj.material.color.getHexString()}">
+        <button id="del" style="margin-top:10px; width:100%; background:red; color:white;">Supprimer</button>
+    `;
+    document.getElementById('cp').oninput = (e) => { obj.material.color.set(e.target.value); saveProject(); };
+    document.getElementById('del').onclick = () => { scene.remove(obj); deselectObject(); saveProject(); };
+}
+
+function deselectObject() {
+    selectedObject = null;
+    transformControls.detach();
+    document.getElementById('properties-panel').innerHTML = '<p>Aucun objet sélectionné</p>';
+}
+
+window.setMode = (m) => transformControls.setMode(m);
+
 renderer.domElement.addEventListener('pointerdown', (e) => {
     if (transformControls.dragging) return;
     const rect = renderer.domElement.getBoundingClientRect();
     mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
     mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
-
     raycaster.setFromCamera(mouse, camera);
     const intersects = raycaster.intersectObjects(scene.children);
-    const valid = intersects.find(i => i.object !== baseplate && i.object !== grid && i.object.type === "Mesh");
-    
+    const valid = intersects.find(i => i.object !== baseplate && i.object.type === "Mesh");
     if (valid) selectObject(valid.object);
     else if (intersects.length > 0 && intersects[0].object === baseplate) deselectObject();
 });
 
-window.addEventListener('resize', () => {
-    camera.aspect = viewport.clientWidth / viewport.clientHeight;
-    camera.updateProjectionMatrix();
-    renderer.setSize(viewport.clientWidth, viewport.clientHeight);
-});
+// Save auto quand on finit de bouger un objet
+transformControls.addEventListener('change', () => { if(selectedObject) saveProject(); });
+
+loadProject();
 
 function animate() {
     requestAnimationFrame(animate);
@@ -133,3 +156,9 @@ function animate() {
     renderer.render(scene, camera);
 }
 animate();
+
+window.addEventListener('resize', () => {
+    camera.aspect = viewport.clientWidth / viewport.clientHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(viewport.clientWidth, viewport.clientHeight);
+});
