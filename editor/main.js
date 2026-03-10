@@ -1,3 +1,17 @@
+import { auth, db } from "../firebase-config.js";
+import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+
+// --- VÉRIFICATION DE SÉCURITÉ ---
+onAuthStateChanged(auth, (user) => {
+    if (!user) {
+        // Si pas de session, retour forcé à la page de connexion
+        window.location.href = "../auth.html";
+    } else {
+        console.log("Accès autorisé :", user.email);
+        loadProject(); // On ne charge le projet que si l'utilisateur est OK
+    }
+});
+
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { TransformControls } from 'three/addons/controls/TransformControls.js';
