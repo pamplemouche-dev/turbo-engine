@@ -1,47 +1,171 @@
 <!DOCTYPE html>
-<html>
+<html lang="fr">
 <head>
-    <title>Web Studio Alpha</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Web Studio - Responsive</title>
     <style>
-        :root { --panel-bg: #2d2d2d; --border: #1a1a1a; --text: #e0e0e0; }
-        body { margin: 0; display: flex; height: 100vh; background: #111; color: var(--text); font-family: 'Segoe UI', sans-serif; }
-        
-        /* Barre du haut */
-        #toolbar { position: absolute; top: 0; width: 100%; height: 40px; background: var(--panel-bg); border-bottom: 1px solid var(--border); display: flex; align-items: center; padding: 0 10px; z-index: 100; }
-        
-        /* Zone 3D */
-        #viewport { flex-grow: 1; position: relative; cursor: crosshair; }
-        
-        /* Panneau de droite (Explorateur & Propriétés) */
-        #sidebar { width: 300px; background: var(--panel-bg); border-left: 1px solid var(--border); display: flex; flex-direction: column; }
-        .panel { flex: 1; border-bottom: 1px solid var(--border); overflow-y: auto; padding: 10px; }
-        h3 { font-size: 12px; text-transform: uppercase; color: #888; margin-bottom: 10px; }
-        
-        button { background: #444; border: 1px solid #555; color: white; padding: 5px 10px; cursor: pointer; margin-right: 5px; }
-        button:hover { background: #555; }
+        :root {
+            --bg-dark: #1e1e1e;
+            --panel-bg: #2d2d2d;
+            --accent: #0078d4;
+            --border: #111;
+            --text: #e0e0e0;
+        }
+
+        body, html { 
+            margin: 0; padding: 0; width: 100%; height: 100%; 
+            overflow: hidden; background: #000; font-family: 'Segoe UI', Tahoma, sans-serif;
+            color: var(--text);
+        }
+
+        /* Conteneur principal */
+        .studio-root {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+
+        /* Barre d'outils (Haut) */
+        .toolbar {
+            height: 45px;
+            background: var(--panel-bg);
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            padding: 0 10px;
+            gap: 10px;
+            overflow-x: auto; /* Scroll horizontal si trop de boutons sur mobile */
+            white-space: nowrap;
+        }
+
+        /* Zone centrale */
+        .main-content {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+            position: relative;
+        }
+
+        /* Viewport 3D (Prend toute la place) */
+        #viewport {
+            flex: 1;
+            background: #333;
+            position: relative;
+        }
+
+        /* Panneaux latéraux (Desktop: Fixe / Mobile: Caché) */
+        .sidebar {
+            width: 280px;
+            background: var(--panel-bg);
+            border-left: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            transition: transform 0.3s ease;
+        }
+
+        .panel-header {
+            background: var(--bg-dark);
+            padding: 8px 12px;
+            font-size: 11px;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: #888;
+        }
+
+        .panel-content {
+            flex: 1;
+            padding: 10px;
+            overflow-y: auto;
+            border-bottom: 1px solid var(--border);
+        }
+
+        /* --- RESPONSIVE ADAPTATIONS --- */
+        @media (max-width: 800px) {
+            .sidebar {
+                position: absolute;
+                right: 0;
+                top: 0;
+                bottom: 0;
+                z-index: 1000;
+                transform: translateX(100%); /* Caché par défaut sur mobile */
+                box-shadow: -5px 0 15px rgba(0,0,0,0.5);
+            }
+
+            .sidebar.active {
+                transform: translateX(0); /* Apparaît au clic */
+            }
+
+            .menu-toggle {
+                display: block !important;
+            }
+        }
+
+        .menu-toggle {
+            display: none;
+            background: var(--accent);
+            border: none;
+            color: white;
+            padding: 5px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        button.tool-btn {
+            background: #444;
+            border: 1px solid #555;
+            color: white;
+            padding: 6px 12px;
+            border-radius: 3px;
+            font-size: 13px;
+            cursor: pointer;
+        }
+
+        button.tool-btn:hover { background: #555; }
+        button.tool-btn.active { border-color: var(--accent); background: #3a4a5a; }
+
     </style>
 </head>
 <body>
 
-    <div id="toolbar">
-        <button onclick="spawnPart()">Part</button>
-        <button onclick="setTool('translate')">Move</button>
-        <button onclick="setTool('rotate')">Rotate</button>
-        <button onclick="setTool('scale')">Scale</button>
+<div class="studio-root">
+    <div class="toolbar">
+        <button class="tool-btn active">Select</button>
+        <button class="tool-btn" onclick="addPart()">Part</button>
+        <button class="tool-btn">Move</button>
+        <div style="flex-grow: 1;"></div> <button class="menu-toggle" onclick="toggleSidebar()">☰ Explorer</button>
     </div>
 
-    <div id="viewport"></div>
+    <div class="main-content">
+        <div id="viewport">
+            <div style="position: absolute; bottom: 10px; left: 10px; color: #888; font-size: 10px;">
+                Mode: Studio Editor v0.1
+            </div>
+        </div>
 
-    <div id="sidebar">
-        <div class="panel" id="explorer">
-            <h3>Explorer</h3>
-            <div id="tree"></div>
-        </div>
-        <div class="panel" id="properties">
-            <h3>Properties</h3>
-            <div id="props-list">Sélectionnez un objet</div>
-        </div>
+        <aside class="sidebar" id="right-sidebar">
+            <div class="panel-header">Explorer</div>
+            <div class="panel-content" id="explorer-tree">
+                <div style="color: #00a2ff;">▼ Workspace</div>
+                <div style="margin-left: 20px;">• Baseplate</div>
+            </div>
+
+            <div class="panel-header">Properties</div>
+            <div class="panel-content" id="properties-panel">
+                <p style="font-style: italic; color: #666;">Aucun objet sélectionné</p>
+            </div>
+        </aside>
     </div>
+</div>
 
-    </body>
+<script>
+    // Petite fonction pour le menu mobile
+    function toggleSidebar() {
+        const sidebar = document.getElementById('right-sidebar');
+        sidebar.classList.toggle('active');
+    }
+</script>
+
+</body>
 </html>
